@@ -27,6 +27,19 @@ const nextConfig = {
     parallelServerBuildTraces: true,
     parallelServerCompiles: true,
   },
+  // ✅ Add webpack customization to support .mjs
+  webpack: (config, { isServer }) => {
+    config.resolve.extensions.push(".mjs");
+
+    // Optional: mark pdfjs-dist as fully ESM-compatible (just in case)
+    config.module.rules.push({
+      test: /\.mjs$/,
+      include: /node_modules/,
+      type: "javascript/auto",
+    });
+
+    return config;
+  },
 }
 
 if (userConfig) {
