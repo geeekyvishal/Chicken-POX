@@ -1,11 +1,12 @@
-"use client"
+// components/UserProfile.tsx
 
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import type { User } from "@supabase/supabase-js"
-import { LogOut, UserIcon } from "lucide-react"
+import { User } from '@supabase/supabase-js'
+import { LogOut, UserIcon } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
 
-import { Button } from "@/components/ui/button"
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,15 +14,14 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { getSupabaseBrowserClient } from "@/lib/supabase"
+} from '@/components/ui/dropdown-menu'
+import { getSupabaseBrowserClient } from '@/lib/supabase'
 
 export function UserProfile() {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
-  const supabase = getSupabaseBrowserClient()
+  const supabase = getSupabaseBrowserClient() // Importing the Supabase client here
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -47,7 +47,7 @@ export function UserProfile() {
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
-    router.push("/")
+    router.push('/')
     router.refresh()
   }
 
@@ -68,14 +68,14 @@ export function UserProfile() {
     )
   }
 
-  const initials = user.email ? user.email.substring(0, 2).toUpperCase() : "U"
+  const initials = user.email ? user.email.substring(0, 2).toUpperCase() : 'U'
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="sm" className="flex items-center gap-2">
           <Avatar className="h-6 w-6">
-            <AvatarImage src="/placeholder.svg" alt={user.email || ""} />
+            <AvatarImage src="/placeholder.svg" alt={user.email || ''} />
             <AvatarFallback>{initials}</AvatarFallback>
           </Avatar>
           <span className="text-sm hidden md:inline-block">{user.email}</span>

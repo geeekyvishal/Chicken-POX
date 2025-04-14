@@ -1,13 +1,13 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { format } from "date-fns"
-import { Plus, Search, Trash2 } from "lucide-react"
+import { format } from "date-fns";
+import { Plus, Search, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
 
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Separator } from "@/components/ui/separator"
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 import {
   Sidebar,
   SidebarContent,
@@ -15,58 +15,79 @@ import {
   SidebarHeader,
   SidebarProvider,
   SidebarTrigger,
-} from "@/components/ui/sidebar"
+} from "@/components/ui/sidebar";
+import { getSupabaseBrowserClient } from "@/lib/supabase"; // Use the singleton client
 
 type ChatHistory = {
-  id: string
-  title: string
-  preview: string
-  date: Date
-}
+  id: string;
+  title: string;
+  preview: string;
+  date: Date;
+};
 
 export function ChatSidebar() {
-  const [searchQuery, setSearchQuery] = useState("")
+  const [searchQuery, setSearchQuery] = useState("");
+  const [chatHistory, setChatHistory] = useState<ChatHistory[]>([]);
 
-  // Mock chat history data
-  const chatHistory: ChatHistory[] = [
-    {
-      id: "1",
-      title: "Tenant Rights Question",
-      preview: "What are my rights as a tenant in Delhi?",
-      date: new Date(2023, 10, 15),
-    },
-    {
-      id: "2",
-      title: "Divorce Procedure",
-      preview: "How do I file for divorce in India?",
-      date: new Date(2023, 10, 10),
-    },
-    {
-      id: "3",
-      title: "Consumer Complaint",
-      preview: "How to file a consumer complaint against an e-commerce company?",
-      date: new Date(2023, 10, 5),
-    },
-    {
-      id: "4",
-      title: "Property Dispute",
-      preview: "My neighbor has encroached on my property. What legal actions can I take?",
-      date: new Date(2023, 9, 28),
-    },
-    {
-      id: "5",
-      title: "Employment Contract",
-      preview: "Is my non-compete clause legally enforceable?",
-      date: new Date(2023, 9, 20),
-    },
-  ]
+  const supabase = getSupabaseBrowserClient(); // Get the client from the singleton
+
+  useEffect(() => {
+    const fetchChats = async () => {
+      const user = (await supabase.auth.getUser()).data.user;
+      if (!user) {
+        console.log("No user found");
+        return;
+      }
+
+      try {
+        // Fetch chat details from the 'chats' table
+        const { data: chats, error: chatError } = await supabase
+          .from("chats")
+          .select("id, title, created_at")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false });
+
+        if (chatError) throw new Error(chatError.message);
+
+        const formattedChats = await Promise.all(
+          chats?.map(async (chat) => {
+            // Fetch the last message from the 'messages' table to show as preview
+            const { data: lastMessage, error: messageError } = await supabase
+              .from("messages")
+              .select("content")
+              .eq("chat_id", chat.id)
+              .order("timestamp", { ascending: false })
+              .limit(1)
+              .single();
+
+            if (messageError) {
+              console.log("Error fetching messages:", messageError.message);
+            }
+
+            return {
+              id: chat.id,
+              title: chat.title || "Untitled Chat",
+              preview: lastMessage?.content || "No messages yet",
+              date: new Date(chat.created_at),
+            };
+          }) ?? []
+        );
+
+        setChatHistory(formattedChats);
+      } catch (error) {
+        console.error("Error fetching chat data:", error);
+      }
+    };
+
+    fetchChats();
+  }, [supabase]); // Add supabase as a dependency
 
   // Filter chat history based on search query
   const filteredHistory = chatHistory.filter(
     (chat) =>
       chat.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      chat.preview.toLowerCase().includes(searchQuery.toLowerCase()),
-  )
+      chat.preview.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
     <SidebarProvider defaultOpen={true}>
@@ -76,9 +97,12 @@ export function ChatSidebar() {
             <div className="flex justify-between items-center">
               <h2 className="text-lg font-semibold">Chat History</h2>
               <div className="flex items-center space-x-1">
-                  <SidebarTrigger className="text-slate-500 md:hidden inline-flex items-center justify-center h-10 w-10 rounded-md hover:bg-accent"/>
-                <Button variant="ghost" size="icon" className="text-slate-500 md:hidden">
-                </Button>
+                <SidebarTrigger className="text-slate-500 md:hidden inline-flex items-center justify-center h-10 w-10 rounded-md hover:bg-accent" />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-slate-500 md:hidden"
+                ></Button>
                 <Button variant="ghost" size="icon" className="text-slate-500">
                   <Plus className="h-4 w-4" />
                   <span className="sr-only">New Chat</span>
@@ -102,27 +126,29 @@ export function ChatSidebar() {
             {filteredHistory.length > 0 ? (
               <div className="space-y-1 p-2">
                 {filteredHistory.map((chat) => (
-                 <Button
-                 key={chat.id}
-                 variant="ghost"
-                 className="w-full h-auto p-2 flex flex-col items-start space-y-0.5 text-left"
-               >
-                 <div className="flex justify-between items-start w-full">
-                   <span className="font-medium text-sm leading-snug">{chat.title}</span>
-                   <span className="text-xs text-slate-500 dark:text-slate-400 shrink-0">
-                     {format(chat.date, "MMM d")}
-                   </span>
-                 </div>
-                 <p className="text-xs text-slate-500 dark:text-slate-400 leading-tight">
-                   {chat.preview}
-                 </p>
-               </Button>
-               
-                
+                  <Button
+                    key={chat.id}
+                    variant="ghost"
+                    className="w-full h-auto p-2 flex flex-col items-start space-y-0.5 text-left"
+                  >
+                    <div className="flex justify-between items-start w-full">
+                      <span className="font-medium text-sm leading-snug">
+                        {chat.title}
+                      </span>
+                      <span className="text-xs text-slate-500 dark:text-slate-400 shrink-0">
+                        {format(chat.date, "MMM d")}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 leading-tight">
+                      {chat.preview}
+                    </p>
+                  </Button>
                 ))}
               </div>
             ) : (
-              <div className="p-4 text-center text-slate-500 dark:text-slate-400">No conversations found</div>
+              <div className="p-4 text-center text-slate-500 dark:text-slate-400">
+                No conversations found
+              </div>
             )}
           </ScrollArea>
         </SidebarContent>
@@ -130,7 +156,11 @@ export function ChatSidebar() {
         <SidebarFooter className="p-4">
           <div className="space-y-4">
             <Separator className="dark:bg-slate-700" />
-            <Button variant="outline" className="w-full justify-start text-slate-600 dark:text-slate-300" size="sm">
+            <Button
+              variant="outline"
+              className="w-full justify-start text-slate-600 dark:text-slate-300"
+              size="sm"
+            >
               <Trash2 className="mr-2 h-4 w-4" />
               Clear History
             </Button>
@@ -138,5 +168,5 @@ export function ChatSidebar() {
         </SidebarFooter>
       </Sidebar>
     </SidebarProvider>
-  )
+  );
 }
