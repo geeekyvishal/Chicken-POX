@@ -49,18 +49,18 @@ export default function ChatPage() {
   const handleSend = async (e?: React.FormEvent) => {
     e?.preventDefault()
     if (!input.trim()) return
-  
+
     const userMessage: Message = {
       id: Date.now().toString(),
       content: input,
       role: "user",
       timestamp: new Date(),
     }
-  
+
     setMessages((prev) => [...prev, userMessage])
     setInput("")
     setIsLoading(true)
-  
+
     const res = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -69,12 +69,12 @@ export default function ChatPage() {
         model: selectedModel,
       }),
     })
-  
+
     if (!res.ok || !res.body) {
       setIsLoading(false)
       return
     }
-  
+
     const reader = res.body.getReader()
     const decoder = new TextDecoder("utf-8")
     let done = false
@@ -84,25 +84,25 @@ export default function ChatPage() {
       role: "assistant" as const,
       timestamp: new Date(),
     }
-  
+
     setMessages((prev) => [...prev, assistantMessage])
-  
+
     while (!done) {
       const { value, done: doneReading } = await reader.read()
       done = doneReading
       const chunkValue = decoder.decode(value)
       assistantMessage.content += chunkValue
-  
+
       setMessages((prev) =>
         prev.map((m) =>
           m.id === assistantMessage.id ? { ...m, content: assistantMessage.content } : m
         )
       )
     }
-  
+
     setIsLoading(false)
   }
-  
+
 
   return (
     <div className="flex h-[calc(100vh-4rem)] overflow-hidden">
@@ -126,8 +126,8 @@ export default function ChatPage() {
                   >
                     <div
                       className={`max-w-[80%] rounded-2xl px-4 py-3 ${message.role === "user"
-                          ? "bg-teal-600 text-white dark:bg-teal-700"
-                          : "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100"
+                        ? "bg-teal-600 text-white dark:bg-teal-700"
+                        : "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100"
                         }`}
                     >
                       {message.role === "assistant" ? (
@@ -175,9 +175,9 @@ export default function ChatPage() {
               onChange={(e) => setSelectedModel(e.target.value)}
               className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-900 text-sm"
             >
-              <option value="llama3-8b-8192">LLaMA 3 8B</option>
-              <option value="llama2-70b-4096">LLaMA 2 70B</option>
-              <option value="mixtral-8x7b-32768">Mixtral 8x7B</option>
+              <option value="llama3-8b-8192">LLaMA 3 8B (Fast)</option>
+              <option value="llama3-70b-8192">LLaMA 3 70B (Powerful)</option>
+              <option value="llama3-70b-4096">LLaMA 3 70B (4096 ctx)</option>
             </select>
           </div>
 

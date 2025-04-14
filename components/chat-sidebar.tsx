@@ -76,8 +76,8 @@ export function ChatSidebar() {
             <div className="flex justify-between items-center">
               <h2 className="text-lg font-semibold">Chat History</h2>
               <div className="flex items-center space-x-1">
+                  <SidebarTrigger className="text-slate-500 md:hidden inline-flex items-center justify-center h-10 w-10 rounded-md hover:bg-accent"/>
                 <Button variant="ghost" size="icon" className="text-slate-500 md:hidden">
-                  <SidebarTrigger />
                 </Button>
                 <Button variant="ghost" size="icon" className="text-slate-500">
                   <Plus className="h-4 w-4" />
