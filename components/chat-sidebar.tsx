@@ -70,14 +70,14 @@ export function ChatSidebar() {
 
   return (
     <SidebarProvider defaultOpen={true}>
-      <Sidebar className="border-r dark:border-slate-700">
+      <Sidebar className="w-[300px] border-r dark:border-slate-700 overflow-hidden">
         <SidebarHeader className="p-4">
           <div className="flex flex-col space-y-4">
             <div className="flex justify-between items-center">
               <h2 className="text-lg font-semibold">Chat History</h2>
               <div className="flex items-center space-x-1">
+                  <SidebarTrigger className="text-slate-500 md:hidden inline-flex items-center justify-center h-10 w-10 rounded-md hover:bg-accent"/>
                 <Button variant="ghost" size="icon" className="text-slate-500 md:hidden">
-                  <SidebarTrigger />
                 </Button>
                 <Button variant="ghost" size="icon" className="text-slate-500">
                   <Plus className="h-4 w-4" />
@@ -97,20 +97,28 @@ export function ChatSidebar() {
           </div>
         </SidebarHeader>
 
-        <SidebarContent>
-          <ScrollArea className="h-[calc(100vh-12rem)]">
+        <SidebarContent className="flex-1 overflow-hidden">
+          <ScrollArea className="h-full">
             {filteredHistory.length > 0 ? (
               <div className="space-y-1 p-2">
                 {filteredHistory.map((chat) => (
-                  <Button key={chat.id} variant="ghost" className="w-full justify-start text-left h-auto py-3">
-                    <div className="flex flex-col space-y-1">
-                      <div className="flex justify-between items-center w-full">
-                        <span className="font-medium truncate">{chat.title}</span>
-                        <span className="text-xs text-slate-500 dark:text-slate-400">{format(chat.date, "MMM d")}</span>
-                      </div>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{chat.preview}</p>
-                    </div>
-                  </Button>
+                 <Button
+                 key={chat.id}
+                 variant="ghost"
+                 className="w-full h-auto p-2 flex flex-col items-start space-y-0.5 text-left"
+               >
+                 <div className="flex justify-between items-start w-full">
+                   <span className="font-medium text-sm leading-snug">{chat.title}</span>
+                   <span className="text-xs text-slate-500 dark:text-slate-400 shrink-0">
+                     {format(chat.date, "MMM d")}
+                   </span>
+                 </div>
+                 <p className="text-xs text-slate-500 dark:text-slate-400 leading-tight">
+                   {chat.preview}
+                 </p>
+               </Button>
+               
+                
                 ))}
               </div>
             ) : (

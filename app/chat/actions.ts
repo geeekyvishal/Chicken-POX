@@ -1,126 +1,35 @@
-"use server"
+import { revalidatePath } from "next/cache";
+import { createServerClient } from "@/lib/supabase";
+import OpenAI from "openai";
 
-import { createServerClient } from "@/lib/supabase"
-import { revalidatePath } from "next/cache"
+const openai = new OpenAI({
+  apiKey: process.env.GROQ_API_KEY,
+  baseURL: "https://api.groq.com/openai/v1", // Required for Groq
+});
 
-export async function createConversation(title: string) {
-  const supabase = createServerClient()
-
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
-  if (!session) {
-    throw new Error("Not authenticated")
-  }
-
-  const { data, error } = await supabase
-    .from("chat_conversations")
-    .insert({
-      user_id: session.user.id,
-      title,
-    })
-    .select()
-    .single()
-
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  // Add initial assistant message
-  await supabase.from("chat_messages").insert({
-    conversation_id: data.id,
-    content: "Hello! I'm your AI legal assistant. How can I help you with your legal questions today?",
-    role: "assistant",
-  })
-
-  revalidatePath("/chat")
-  return data
-}
-
-export async function getConversations() {
-  const supabase = createServerClient()
+export async function addMessage(conversationId: string, content: string, role: "user" | "assistant", model: string){
+  const supabase = createServerClient();
 
   const {
     data: { session },
-  } = await supabase.auth.getSession()
+  } = await supabase.auth.getSession();
   if (!session) {
-    return []
+    throw new Error("Not authenticated");
   }
 
-  const { data, error } = await supabase
-    .from("chat_conversations")
-    .select("*")
-    .eq("user_id", session.user.id)
-    .order("updated_at", { ascending: false })
-
-  if (error) {
-    console.error("Error fetching conversations:", error)
-    return []
-  }
-
-  return data
-}
-
-export async function getMessages(conversationId: string) {
-  const supabase = createServerClient()
-
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
-  if (!session) {
-    return []
-  }
-
-  // First verify the conversation belongs to the user
   const { data: conversation, error: conversationError } = await supabase
     .from("chat_conversations")
     .select("*")
     .eq("id", conversationId)
     .eq("user_id", session.user.id)
-    .single()
+    .single();
 
   if (conversationError || !conversation) {
-    console.error("Error fetching conversation:", conversationError)
-    return []
+    throw new Error("Conversation not found or access denied");
   }
 
-  const { data, error } = await supabase
-    .from("chat_messages")
-    .select("*")
-    .eq("conversation_id", conversationId)
-    .order("created_at", { ascending: true })
-
-  if (error) {
-    console.error("Error fetching messages:", error)
-    return []
-  }
-
-  return data
-}
-
-export async function addMessage(conversationId: string, content: string, role: "user" | "assistant") {
-  const supabase = createServerClient()
-
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
-  if (!session) {
-    throw new Error("Not authenticated")
-  }
-
-  // First verify the conversation belongs to the user
-  const { data: conversation, error: conversationError } = await supabase
-    .from("chat_conversations")
-    .select("*")
-    .eq("id", conversationId)
-    .eq("user_id", session.user.id)
-    .single()
-
-  if (conversationError || !conversation) {
-    throw new Error("Conversation not found or access denied")
-  }
-
-  const { data, error } = await supabase
+  // Store user message
+  const { data: userMessage, error: userMsgErr } = await supabase
     .from("chat_messages")
     .insert({
       conversation_id: conversationId,
@@ -128,46 +37,46 @@ export async function addMessage(conversationId: string, content: string, role: 
       role,
     })
     .select()
-    .single()
+    .single();
 
-  if (error) {
-    throw new Error(error.message)
+  if (userMsgErr) {
+    throw new Error(userMsgErr.message);
   }
 
-  // Update conversation's updated_at
-  await supabase.from("chat_conversations").update({ updated_at: new Date().toISOString() }).eq("id", conversationId)
+  if (role === "user") {
+    // Fetch previous messages
+    const { data: previousMessages } = await supabase
+      .from("chat_messages")
+      .select("role, content")
+      .eq("conversation_id", conversationId)
+      .order("created_at", { ascending: true });
 
-  revalidatePath(`/chat`)
-  return data
-}
+    const formattedMessages = previousMessages?.map((msg) => ({
+      role: msg.role,
+      content: msg.content,
+    })) ?? [];
 
-export async function deleteConversation(conversationId: string) {
-  const supabase = createServerClient()
+    // Call Groq API (LLaMA 3)
+    const chatResponse = await openai.chat.completions.create({
+      model,
+      messages: formattedMessages,
+    });
+    
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
-  if (!session) {
-    throw new Error("Not authenticated")
+    const aiMessage = chatResponse.choices[0].message.content;
+
+    // Store assistant reply
+    await supabase.from("chat_messages").insert({
+      conversation_id: conversationId,
+      content: aiMessage,
+      role: "assistant",
+    });
   }
 
-  // First verify the conversation belongs to the user
-  const { data: conversation, error: conversationError } = await supabase
-    .from("chat_conversations")
-    .select("*")
-    .eq("id", conversationId)
-    .eq("user_id", session.user.id)
-    .single()
+  await supabase.from("chat_conversations")
+    .update({ updated_at: new Date().toISOString() })
+    .eq("id", conversationId);
 
-  if (conversationError || !conversation) {
-    throw new Error("Conversation not found or access denied")
-  }
-
-  const { error } = await supabase.from("chat_conversations").delete().eq("id", conversationId)
-
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  revalidatePath("/chat")
+  revalidatePath(`/chat`);
+  return { success: true };
 }

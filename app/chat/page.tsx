@@ -34,6 +34,7 @@ export default function ChatPage() {
   const [isLoading, setIsLoading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const [selectedModel, setSelectedModel] = useState("llama3-8b-8192")
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -47,10 +48,8 @@ export default function ChatPage() {
 
   const handleSend = async (e?: React.FormEvent) => {
     e?.preventDefault()
-
     if (!input.trim()) return
 
-    // Add user message
     const userMessage: Message = {
       id: Date.now().toString(),
       content: input,
@@ -62,42 +61,59 @@ export default function ChatPage() {
     setInput("")
     setIsLoading(true)
 
-    // Simulate API call
-    setTimeout(() => {
-      // Mock response based on user input
-      let responseContent = ""
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        messages: [...messages, userMessage].map(({ role, content }) => ({ role, content })),
+        model: selectedModel,
+      }),
+    })
 
-      if (input.toLowerCase().includes("divorce")) {
-        responseContent =
-          "## Divorce in India\n\nDivorce in India is governed by various personal laws depending on your religion:\n\n1. **Hindu Marriage Act, 1955** - For Hindus, Buddhists, Jains, and Sikhs\n2. **Muslim Personal Law** - For Muslims\n3. **Indian Divorce Act, 1869** - For Christians\n4. **Special Marriage Act, 1954** - For inter-religious marriages\n\nThe general grounds for divorce include:\n- Cruelty (mental or physical)\n- Desertion for at least 2 years\n- Conversion to another religion\n- Mental disorder\n- Communicable disease\n- Presumption of death\n- Mutual consent\n\nWould you like more specific information about divorce procedures under any particular law?"
-      } else if (input.toLowerCase().includes("tenant") || input.toLowerCase().includes("rent")) {
-        responseContent =
-          "## Tenant Rights in India\n\nAs a tenant in India, you have several rights protected by law:\n\n1. **Right to a proper rental agreement**\n2. **Protection against arbitrary eviction**\n3. **Right to essential services** like water and electricity\n4. **Right to privacy** - landlord cannot enter without notice\n5. **Right to receipt** for rent payment\n\nRent control laws vary by state, but most states have regulations on:\n- Rent increases\n- Security deposit limits\n- Eviction procedures\n\nDo you have a specific tenant rights issue you'd like to discuss?"
-      } else {
-        responseContent =
-          "Thank you for your question. Legal matters can be complex, and I'd be happy to provide some general information.\n\nHowever, please note that this is general guidance and not specific legal advice. Each case is unique, and laws can vary by state in India.\n\nCould you provide more details about your situation so I can give you more relevant information?"
-      }
-
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        content: responseContent,
-        role: "assistant",
-        timestamp: new Date(),
-      }
-
-      setMessages((prev) => [...prev, assistantMessage])
+    if (!res.ok || !res.body) {
       setIsLoading(false)
-    }, 1500)
+      return
+    }
+
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder("utf-8")
+    let done = false
+    let assistantMessage = {
+      id: (Date.now() + 1).toString(),
+      content: "",
+      role: "assistant" as const,
+      timestamp: new Date(),
+    }
+
+    setMessages((prev) => [...prev, assistantMessage])
+
+    while (!done) {
+      const { value, done: doneReading } = await reader.read()
+      done = doneReading
+      const chunkValue = decoder.decode(value)
+      assistantMessage.content += chunkValue
+
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === assistantMessage.id ? { ...m, content: assistantMessage.content } : m
+        )
+      )
+    }
+
+    setIsLoading(false)
   }
+
 
   return (
     <div className="flex h-[calc(100vh-4rem)] overflow-hidden">
-      <ChatSidebar />
+      <div className="w-75 h-full border-r dark:border-slate-700 overflow-y-auto">
+        <ChatSidebar />
+      </div>
 
       <div className="flex-1 flex flex-col">
         <div className="flex-1 overflow-hidden">
-          <ScrollArea className="h-full p-4">
-            <div className="max-w-3xl mx-auto space-y-4 pb-20">
+          <ScrollArea className="h-full p-6 sm:p-8">
+            <div className="w-full max-w-2xl mx-auto space-y-4 pb-20">
               <AnimatePresence initial={false}>
                 {messages.map((message) => (
                   <motion.div
@@ -109,11 +125,10 @@ export default function ChatPage() {
                     className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
                   >
                     <div
-                      className={`max-w-[80%] rounded-2xl px-4 py-3 ${
-                        message.role === "user"
-                          ? "bg-teal-600 text-white dark:bg-teal-700"
-                          : "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100"
-                      }`}
+                      className={`max-w-[80%] rounded-2xl px-4 py-3 ${message.role === "user"
+                        ? "bg-teal-600 text-white dark:bg-teal-700"
+                        : "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100"
+                        }`}
                     >
                       {message.role === "assistant" ? (
                         <div className="prose prose-slate dark:prose-invert prose-p:leading-relaxed prose-pre:p-0 max-w-none">
@@ -123,9 +138,8 @@ export default function ChatPage() {
                         <p>{message.content}</p>
                       )}
                       <div
-                        className={`text-xs mt-1 ${
-                          message.role === "user" ? "text-teal-100" : "text-slate-500 dark:text-slate-400"
-                        }`}
+                        className={`text-xs mt-1 ${message.role === "user" ? "text-teal-100" : "text-slate-500 dark:text-slate-400"
+                          }`}
                       >
                         {format(message.timestamp, "h:mm a")}
                       </div>
@@ -155,6 +169,18 @@ export default function ChatPage() {
         </div>
 
         <div className="border-t bg-white dark:bg-slate-900 dark:border-slate-700 p-4">
+          <div className="max-w-3xl mx-auto mb-2">
+            <select
+              value={selectedModel}
+              onChange={(e) => setSelectedModel(e.target.value)}
+              className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-900 text-sm"
+            >
+              <option value="llama3-8b-8192">LLaMA 3 8B (Fast)</option>
+              <option value="llama3-70b-8192">LLaMA 3 70B (Powerful)</option>
+              <option value="llama3-70b-4096">LLaMA 3 70B (4096 ctx)</option>
+            </select>
+          </div>
+
           <form onSubmit={handleSend} className="max-w-3xl mx-auto flex gap-2">
             <Input
               ref={inputRef}
