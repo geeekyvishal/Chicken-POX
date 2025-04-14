@@ -1,8 +1,7 @@
 "use client"
 
 import type React from "react"
-
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useCallback, useMemo } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import { Send } from "lucide-react"
 import { format } from "date-fns"
@@ -46,7 +45,8 @@ export default function ChatPage() {
     inputRef.current?.focus()
   }, [])
 
-  const handleSend = async (e?: React.FormEvent) => {
+  // Memoize handleSend to prevent unnecessary re-creations
+  const handleSend = useCallback(async (e?: React.FormEvent) => {
     e?.preventDefault()
     if (!input.trim()) return
 
@@ -101,8 +101,14 @@ export default function ChatPage() {
     }
 
     setIsLoading(false)
-  }
+  }, [input, messages, selectedModel])
 
+  // Memoize model options to prevent unnecessary re-rendering
+  const modelOptions = useMemo(() => [
+    { value: "llama3-8b-8192", label: "LLaMA 3 8B (Fast)" },
+    { value: "llama3-70b-8192", label: "LLaMA 3 70B (Powerful)" },
+    { value: "llama3-70b-4096", label: "LLaMA 3 70B (4096 ctx)" },
+  ], [])
 
   return (
     <div className="flex h-[calc(100vh-4rem)] overflow-hidden">
@@ -174,10 +180,13 @@ export default function ChatPage() {
               value={selectedModel}
               onChange={(e) => setSelectedModel(e.target.value)}
               className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-900 text-sm"
+              disabled={isLoading}
             >
-              <option value="llama3-8b-8192">LLaMA 3 8B (Fast)</option>
-              <option value="llama3-70b-8192">LLaMA 3 70B (Powerful)</option>
-              <option value="llama3-70b-4096">LLaMA 3 70B (4096 ctx)</option>
+              {modelOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
             </select>
           </div>
 
