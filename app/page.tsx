@@ -95,7 +95,7 @@ export default function LandingPage() {
               transition={{ duration: 0.5, delay: 0.2 }}
             >
               <Image
-                src="/placeholder.svg?height=500&width=500"
+                src="/image.png?height=500&width=500"
                 width={500}
                 height={500}
                 alt="Legal assistance illustration"
