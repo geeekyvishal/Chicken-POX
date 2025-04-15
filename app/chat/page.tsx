@@ -112,9 +112,9 @@ export default function ChatPage() {
 
   return (
     <div className="flex h-[calc(100vh-4rem)] overflow-hidden">
-      <div className="w-75 h-full border-r dark:border-slate-700 overflow-y-auto">
+      {/* <div className="w-75 h-full border-r dark:border-slate-700 overflow-y-auto">
         <ChatSidebar />
-      </div>
+      </div> */}
 
       <div className="flex-1 flex flex-col">
         <div className="flex-1 overflow-hidden">
